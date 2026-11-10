@@ -3,180 +3,164 @@ import {
   ShieldCheck,
   Moon,
   Sun,
-  Activity,
-  CheckCircle2,
-  XCircle,
-  Loader2,
-  Cpu,
+  LayoutDashboard,
+  Table2,
+  Siren,
   FileText,
+  RotateCcw,
 } from "lucide-react";
-import { getHealth, type HealthResponse } from "./lib/api";
+import { analizarArchivo, mensajeError } from "./lib/api";
+import type { AnalyzeResponse } from "./lib/types";
+import { FileUpload } from "./components/FileUpload";
+import { Dashboard } from "./components/Dashboard";
+import { LogsTable } from "./components/LogsTable";
+import { IncidentsView } from "./components/IncidentsView";
+import { ReportView } from "./components/ReportView";
 
-type Estado = "cargando" | "ok" | "error";
+type Tab = "dashboard" | "logs" | "incidentes" | "informe";
 
-function App() {
-  const [dark, setDark] = useState(true);
-  const [estado, setEstado] = useState<Estado>("cargando");
-  const [health, setHealth] = useState<HealthResponse | null>(null);
-
-  // Dark mode: alterna la clase en <html>.
+function useDarkMode() {
+  const [dark, setDark] = useState(() => {
+    try {
+      return localStorage.getItem("soc-theme") !== "light";
+    } catch {
+      return true;
+    }
+  });
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);
-  }, [dark]);
-
-  const comprobar = async () => {
-    setEstado("cargando");
     try {
-      const data = await getHealth();
-      setHealth(data);
-      setEstado("ok");
+      localStorage.setItem("soc-theme", dark ? "dark" : "light");
     } catch {
-      setHealth(null);
-      setEstado("error");
+      /* ignora */
+    }
+  }, [dark]);
+  return { dark, setDark };
+}
+
+const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
+  { id: "dashboard", label: "Dashboard", icon: <LayoutDashboard className="h-4 w-4" /> },
+  { id: "logs", label: "Logs", icon: <Table2 className="h-4 w-4" /> },
+  { id: "incidentes", label: "Incidentes", icon: <Siren className="h-4 w-4" /> },
+  { id: "informe", label: "Informe", icon: <FileText className="h-4 w-4" /> },
+];
+
+function App() {
+  const { dark, setDark } = useDarkMode();
+  const [analisis, setAnalisis] = useState<AnalyzeResponse | null>(null);
+  const [cargando, setCargando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [tab, setTab] = useState<Tab>("dashboard");
+
+  const subir = async (file: File) => {
+    setCargando(true);
+    setError(null);
+    try {
+      const data = await analizarArchivo(file);
+      setAnalisis(data);
+      setTab("dashboard");
+    } catch (err) {
+      setError(mensajeError(err, "No se pudo analizar el archivo."));
+    } finally {
+      setCargando(false);
     }
   };
 
-  useEffect(() => {
-    comprobar();
-  }, []);
+  const reiniciar = () => {
+    setAnalisis(null);
+    setError(null);
+  };
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      {/* Barra superior */}
-      <header className="border-b border-border">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4">
+      <header className="sticky top-0 z-10 border-b border-border bg-background/80 backdrop-blur">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/15 text-primary">
               <ShieldCheck className="h-6 w-6" />
             </div>
             <div>
-              <h1 className="text-lg font-bold leading-tight">
-                SOC L2 Analyzer
-              </h1>
+              <h1 className="text-lg font-bold leading-tight">SOC L2 Analyzer</h1>
               <p className="text-xs text-muted-foreground">
-                Análisis de incidentes asistido por IA
+                Análisis de incidentes asistido por IA · Confidencial
               </p>
             </div>
           </div>
-          <button
-            onClick={() => setDark((d) => !d)}
-            className="rounded-lg border border-border bg-card p-2 text-muted-foreground transition hover:text-foreground"
-            aria-label="Cambiar tema"
-          >
-            {dark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-          </button>
+          <div className="flex items-center gap-2">
+            {analisis && (
+              <button
+                onClick={reiniciar}
+                className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground transition hover:text-foreground"
+              >
+                <RotateCcw className="h-4 w-4" /> Nuevo análisis
+              </button>
+            )}
+            <button
+              onClick={() => setDark((d) => !d)}
+              className="rounded-lg border border-border bg-card p-2 text-muted-foreground transition hover:text-foreground"
+              aria-label="Cambiar tema"
+            >
+              {dark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+            </button>
+          </div>
         </div>
+
+        {analisis && (
+          <nav className="mx-auto flex max-w-7xl gap-1 px-4">
+            {TABS.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                className={`flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-sm font-medium transition ${
+                  tab === t.id
+                    ? "border-primary text-primary"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {t.icon}
+                {t.label}
+              </button>
+            ))}
+          </nav>
+        )}
       </header>
 
-      {/* Contenido */}
-      <main className="mx-auto max-w-5xl px-4 py-10">
-        <div className="mb-8">
-          <h2 className="text-2xl font-bold">Estado del sistema</h2>
-          <p className="text-muted-foreground">
-            Módulo 1 — Verificación de conectividad backend ↔ frontend.
-          </p>
-        </div>
-
-        <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
-          <div className="mb-5 flex items-center gap-2 text-sm font-medium text-muted-foreground">
-            <Activity className="h-4 w-4" />
-            <span>GET /api/health</span>
-          </div>
-
-          {estado === "cargando" && (
-            <div className="flex items-center gap-3 text-muted-foreground">
-              <Loader2 className="h-5 w-5 animate-spin" />
-              Comprobando el backend…
-            </div>
-          )}
-
-          {estado === "error" && (
-            <div className="space-y-4">
-              <div className="flex items-center gap-3 text-critico">
-                <XCircle className="h-5 w-5" />
-                <span className="font-medium">
-                  No se pudo contactar el backend.
-                </span>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Asegúrate de que el backend esté corriendo en el puerto 8000:
-                <code className="ml-1 rounded bg-muted px-1.5 py-0.5 text-xs">
-                  uvicorn app.main:app --reload
-                </code>
+      <main className="mx-auto max-w-7xl px-4 py-6">
+        {!analisis ? (
+          <div className="py-10">
+            <div className="mb-8 text-center">
+              <h2 className="text-2xl font-bold">Analiza un export del SIEM</h2>
+              <p className="mt-1 text-muted-foreground">
+                La detección es 100% determinista. La IA solo redacta el informe a
+                partir de la evidencia.
               </p>
-              <button
-                onClick={comprobar}
-                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90"
-              >
-                Reintentar
-              </button>
             </div>
-          )}
-
-          {estado === "ok" && health && (
-            <div className="space-y-5">
-              <div className="flex items-center gap-3 text-bajo">
-                <CheckCircle2 className="h-5 w-5" />
-                <span className="font-medium">
-                  Backend operativo ({health.service} v{health.version})
-                </span>
-              </div>
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <InfoCard
-                  icon={<Cpu className="h-5 w-5" />}
-                  titulo="Modo de redacción"
-                  valor={
-                    health.modo_ia === "ia"
-                      ? "IA (Anthropic)"
-                      : "Plantillas deterministas"
-                  }
-                  nota={
-                    health.ia_disponible
-                      ? `Modelo: ${health.modelo}`
-                      : "Sin API key — fallback activo"
-                  }
-                />
-                <InfoCard
-                  icon={<FileText className="h-5 w-5" />}
-                  titulo="Próximo paso"
-                  valor="Módulo 2"
-                  nota="Carga y parseo del .xlsx"
-                />
-              </div>
+            <FileUpload onFile={subir} cargando={cargando} error={error} />
+          </div>
+        ) : (
+          <>
+            <div className="mb-5 rounded-lg border border-border bg-card p-4 text-sm">
+              {analisis.resumen}
             </div>
-          )}
-        </div>
-
-        <p className="mt-8 text-center text-xs text-muted-foreground">
-          Analista: Yazmani Reyes Hernández · Clasificación: Confidencial
-        </p>
+            {tab === "dashboard" && (
+              <Dashboard
+                estadisticas={analisis.estadisticas}
+                incidentes={analisis.incidentes}
+                hallazgos={analisis.hallazgos}
+              />
+            )}
+            {tab === "logs" && <LogsTable eventos={analisis.eventos_preview} />}
+            {tab === "incidentes" && (
+              <IncidentsView
+                incidentes={analisis.incidentes}
+                hallazgos={analisis.hallazgos}
+                eventos={analisis.eventos_preview}
+              />
+            )}
+            {tab === "informe" && <ReportView analisis={analisis} />}
+          </>
+        )}
       </main>
-    </div>
-  );
-}
-
-function InfoCard({
-  icon,
-  titulo,
-  valor,
-  nota,
-}: {
-  icon: React.ReactNode;
-  titulo: string;
-  valor: string;
-  nota: string;
-}) {
-  return (
-    <div className="rounded-lg border border-border bg-background p-4">
-      <div className="mb-2 flex items-center gap-2 text-muted-foreground">
-        {icon}
-        <span className="text-xs font-medium uppercase tracking-wide">
-          {titulo}
-        </span>
-      </div>
-      <div className="text-lg font-semibold">{valor}</div>
-      <div className="text-xs text-muted-foreground">{nota}</div>
     </div>
   );
 }
