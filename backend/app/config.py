@@ -23,7 +23,7 @@ class Settings:
         # Modelo por defecto documentado y fácilmente editable desde .env.
         # NOTA: el ID definitivo del modelo se valida en el Módulo 5 (capa IA).
         self.anthropic_model: str = (
-            os.getenv("ANTHROPIC_MODEL", "").strip() or "claude-sonnet-4-5"
+            os.getenv("ANTHROPIC_MODEL", "").strip() or "claude-sonnet-5"
         )
 
         # --- CORS ---

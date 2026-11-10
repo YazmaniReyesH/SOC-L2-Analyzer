@@ -1,14 +1,19 @@
 """Punto de entrada de la API FastAPI del analizador SOC N2.
 
-Módulo 1: solo expone CORS + GET /api/health.
-Los endpoints de análisis, informe y PDF se agregan en módulos posteriores.
+Endpoints:
+- GET  /api/health   -> estado y disponibilidad de IA.
+- POST /api/analyze  -> parsea el .xlsx y devuelve estadísticas, preview,
+                        hallazgos e incidentes (detección determinista).
 """
 from __future__ import annotations
 
-from fastapi import FastAPI
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
+from .models import AnalyzeResponse
+from .parsing import ParseError, load_events
+from .service import analizar_eventos
 
 app = FastAPI(
     title="SOC L2 Analyzer API",
@@ -16,7 +21,7 @@ app = FastAPI(
         "API de análisis de incidentes de seguridad. Detección 100% "
         "determinista; la IA solo redacta el informe a partir de la evidencia."
     ),
-    version="0.1.0",
+    version="0.2.0",
 )
 
 app.add_middleware(
@@ -30,12 +35,7 @@ app.add_middleware(
 
 @app.get("/api/health", tags=["sistema"])
 def health() -> dict:
-    """Estado del servicio y disponibilidad de la IA.
-
-    `modo_ia` indica cómo se redactaría el informe ahora mismo:
-    - "ia": hay API key configurada.
-    - "plantillas": no hay API key -> se usa el fallback determinista.
-    """
+    """Estado del servicio y disponibilidad de la IA."""
     return {
         "status": "ok",
         "service": "soc-l2-analyzer",
@@ -44,3 +44,25 @@ def health() -> dict:
         "modo_ia": "ia" if settings.anthropic_configured else "plantillas",
         "modelo": settings.anthropic_model,
     }
+
+
+@app.post("/api/analyze", response_model=AnalyzeResponse, tags=["análisis"])
+async def analyze(file: UploadFile = File(...)) -> AnalyzeResponse:
+    """Recibe el export .xlsx del SIEM y devuelve el análisis completo."""
+    nombre = (file.filename or "").lower()
+    if not nombre.endswith((".xlsx", ".xlsm")):
+        raise HTTPException(
+            status_code=400,
+            detail="Formato no soportado. Sube un archivo .xlsx exportado del SIEM.",
+        )
+
+    contenido = await file.read()
+    if not contenido:
+        raise HTTPException(status_code=400, detail="El archivo está vacío.")
+
+    try:
+        eventos = load_events(contenido)
+    except ParseError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return analizar_eventos(eventos)

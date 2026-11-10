@@ -84,7 +84,7 @@ docker compose up --build
 | Variable | Dónde | Descripción | Default |
 |----------|-------|-------------|---------|
 | `ANTHROPIC_API_KEY` | backend | Clave Anthropic (opcional). Vacía = plantillas. | *(vacía)* |
-| `ANTHROPIC_MODEL` | backend | Modelo a usar con IA. | `claude-sonnet-4-5` |
+| `ANTHROPIC_MODEL` | backend | Modelo a usar con IA. | `claude-sonnet-5` |
 | `CORS_ORIGINS` | backend | Orígenes permitidos (coma). | `localhost:5173` |
 | `VITE_API_TARGET` | frontend | Target del proxy `/api` en dev. | `localhost:8000` |
 
