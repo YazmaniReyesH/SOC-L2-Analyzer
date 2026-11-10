@@ -212,6 +212,26 @@ def test_ac6_anomalias(resultado):
 # --------------------------------------------------------------------------- #
 # Resumen mínimo esperado
 # --------------------------------------------------------------------------- #
+def test_ips_externas_origen_y_destino(resultado):
+    """Las IPs externas deben incluir origen Y destino/exfil (5 en total)."""
+    from app.stats import calcular_estadisticas
+
+    eventos, _, _, _ = resultado
+    est = calcular_estadisticas(eventos)
+    assert set(est.ips_externas_origen) == {"192.0.2.91", "198.51.100.77", "203.0.113.74"}
+    assert set(est.ips_externas_destino) == {"198.51.100.88", "203.0.113.88"}
+    assert len(est.ips_externas_unicas) == 5
+
+
+def test_incidente_multivector(resultado):
+    """El incidente de intrusión agrupa 2 ramas con entidades distintas."""
+    _, _, incidentes, _ = resultado
+    inc = next(i for i in incidentes if "198.51.100.77" in i.ips)
+    assert inc.multi_vector, "El incidente de intrusión debería ser multi-vector."
+    actores = {v.actor for v in inc.vectores}
+    assert "CORP\\admin" in actores and "CORP\\backupsvc" in actores
+
+
 def test_minimo_incidentes_y_criticidades(resultado):
     _, _, incidentes, _ = resultado
     assert len(incidentes) >= 6, f"Se esperaban >= 6 incidentes, hay {len(incidentes)}."

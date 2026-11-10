@@ -23,9 +23,42 @@ from ..models import (
     Finding,
     Incidente,
     LogEvent,
+    VectorIncidente,
 )
+from ..parsing import is_external_ip
 
 _INV_RANGO = {v: k for k, v in RANGO_CRITICIDAD.items()}
+
+# Orden canónico de etapas de la kill chain.
+ETAPAS_ORDEN = [
+    "Acceso inicial",
+    "Escalamiento de privilegios",
+    "Ejecución",
+    "Movimiento lateral",
+    "Colección",
+    "Persistencia",
+    "Exfiltración",
+    "Reconocimiento",
+    "Anomalía",
+]
+
+
+def _actor_de(f: Finding) -> str:
+    """Identidad representativa del actor de un hallazgo (para separar ramas)."""
+    if len(f.usuarios) == 1:
+        return f.usuarios[0]
+    externas = [ip for ip in f.ips if is_external_ip(ip)]
+    if externas:
+        return externas[0]
+    if f.usuarios:
+        return f.usuarios[0]
+    if f.ips:
+        return f.ips[0]
+    return f.activos[0] if f.activos else f.id
+
+
+def _ordenar_etapas(cats: set[str]) -> list[str]:
+    return [c for c in ETAPAS_ORDEN if c in cats]
 
 
 def _entidades(f: Finding) -> set[str]:
@@ -148,21 +181,53 @@ def _construir_incidente(findings: list[Finding], by_id: dict[str, LogEvent]) ->
     ips = sorted({i for f in findings for i in f.ips})
     usuarios = sorted({u for f in findings for u in f.usuarios})
     mitre = sorted({m for f in findings for m in f.mitre})
-    etapas = [
-        c
-        for c in ["Acceso inicial", "Escalamiento de privilegios", "Ejecución",
-                  "Movimiento lateral", "Colección", "Persistencia",
-                  "Exfiltración", "Reconocimiento", "Anomalía"]
-        if c in {f.categoria for f in findings}
-    ]
+    etapas = _ordenar_etapas({f.categoria for f in findings})
     crit = criticidad_incidente(findings)
+
+    # --- Vectores (ramas): agrupa hallazgos por actor para no forzar una cadena
+    #     lineal cuando hay varias entidades convergiendo al mismo incidente. ---
+    ramas: dict[str, list[Finding]] = defaultdict(list)
+    for f in findings:
+        ramas[_actor_de(f)].append(f)
+    vectores: list[VectorIncidente] = []
+    for actor, fs in ramas.items():
+        etapas_v = _ordenar_etapas({f.categoria for f in fs})
+        ini_v = min((f.inicio for f in fs if f.inicio), default=None)
+        vectores.append(
+            VectorIncidente(
+                actor=actor,
+                usuarios=sorted({u for f in fs for u in f.usuarios}),
+                activos=sorted({a for f in fs for a in f.activos}),
+                ips=sorted({i for f in fs for i in f.ips}),
+                etapas=etapas_v,
+                hallazgos=[f.id for f in fs],
+                resumen=(
+                    f"{actor} — {', '.join(etapas_v)} "
+                    f"({len(fs)} hallazgo{'s' if len(fs) != 1 else ''})."
+                ),
+            )
+        )
+    vectores.sort(key=lambda v: (v.actor))
+    multi_vector = len(vectores) >= 2
     inicios = [f.inicio for f in findings if f.inicio]
     fines = [f.fin for f in findings if f.fin]
+    if multi_vector:
+        estructura = (
+            f"Incidente MULTI-VECTOR: {len(vectores)} ramas correlacionadas "
+            f"(actores: {', '.join(v.actor for v in vectores)}) que convergen por "
+            f"entidades compartidas (activos: {', '.join(activos) or 'n/d'}) dentro de "
+            f"una ventana de {C.CORRELACION_VENTANA_MIN} min. No se fuerza una cadena "
+            "lineal: cada rama refleja sus propias entidades."
+        )
+    else:
+        estructura = (
+            f"Incidente conformado por {len(findings)} hallazgo(s) correlacionados por "
+            f"entidades compartidas (activos: {', '.join(activos) or 'n/d'}) dentro de "
+            f"una ventana de {C.CORRELACION_VENTANA_MIN} min."
+        )
     just = (
-        f"Incidente conformado por {len(findings)} hallazgo(s) correlacionados por "
-        f"entidades compartidas (activos: {', '.join(activos) or 'n/d'}) dentro de una "
-        f"ventana temporal de {C.CORRELACION_VENTANA_MIN} min. "
-        f"Etapas observadas: {', '.join(etapas)}. "
+        estructura
+        + f" Etapas observadas: {', '.join(etapas)}. "
         + (
             "Se clasifica como Crítico por involucrar exfiltración de datos o una "
             "cadena de ataque de 4+ etapas."
@@ -181,6 +246,8 @@ def _construir_incidente(findings: list[Finding], by_id: dict[str, LogEvent]) ->
         usuarios=usuarios,
         mitre=mitre,
         etapas=etapas,
+        vectores=vectores,
+        multi_vector=multi_vector,
         impacto=_impacto(findings),
         inicio=min(inicios) if inicios else None,
         fin=max(fines) if fines else None,

@@ -69,7 +69,10 @@ class Estadisticas(BaseModel):
     por_log_source: list[Conteo] = Field(default_factory=list)
     por_hostname: list[Conteo] = Field(default_factory=list)
     por_resultado: list[Conteo] = Field(default_factory=list)
-    ips_externas_unicas: list[str] = Field(default_factory=list)
+    # IPs externas separadas por rol (derivadas de los datos, sin hardcodear).
+    ips_externas_origen: list[str] = Field(default_factory=list)
+    ips_externas_destino: list[str] = Field(default_factory=list)
+    ips_externas_unicas: list[str] = Field(default_factory=list)  # unión (total)
     top_ips_externas: list[Conteo] = Field(default_factory=list)
     hosts_afectados: list[str] = Field(default_factory=list)
     linea_tiempo: list[PuntoTiempo] = Field(default_factory=list)
@@ -116,6 +119,22 @@ class EventoTimeline(BaseModel):
     descripcion: str
 
 
+class VectorIncidente(BaseModel):
+    """Una 'rama' del incidente: un actor/entidad distinto que converge con otros.
+
+    Permite describir incidentes multi-vía como vectores correlacionados en lugar
+    de forzar una única cadena lineal.
+    """
+
+    actor: str
+    usuarios: list[str] = Field(default_factory=list)
+    activos: list[str] = Field(default_factory=list)
+    ips: list[str] = Field(default_factory=list)
+    etapas: list[str] = Field(default_factory=list)
+    hallazgos: list[str] = Field(default_factory=list)
+    resumen: str = ""
+
+
 class Incidente(BaseModel):
     """Grupo de hallazgos correlacionados por entidades y proximidad temporal."""
 
@@ -129,6 +148,8 @@ class Incidente(BaseModel):
     usuarios: list[str] = Field(default_factory=list)
     mitre: list[str] = Field(default_factory=list)
     etapas: list[str] = Field(default_factory=list)  # etapas de la kill chain
+    vectores: list[VectorIncidente] = Field(default_factory=list)
+    multi_vector: bool = False
     impacto: str = ""
     inicio: datetime | None = None
     fin: datetime | None = None
