@@ -116,7 +116,7 @@ def _read_dataframe(source: str | Path | bytes) -> pd.DataFrame:
         ) from exc
 
     hoja = SHEET_NAME if SHEET_NAME in xl.sheet_names else xl.sheet_names[0]
-    df = xl.parse(hoja, dtype=str)
+    df = pd.read_excel(xl, sheet_name=hoja, dtype=str)
     df.attrs["hoja"] = hoja
     return df
 
