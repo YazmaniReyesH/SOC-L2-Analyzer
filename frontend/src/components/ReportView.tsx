@@ -10,6 +10,7 @@ import {
 import { descargarPdf, generarInforme, mensajeError } from "../lib/api";
 import type { AnalyzeResponse, Informe } from "../lib/types";
 import { Card } from "./ui/Card";
+import { SeverityBadge } from "./ui/SeverityBadge";
 
 function ModoBadge({ informe }: { informe: Informe }) {
   const ia = informe.modo_ia === "ia";
@@ -22,8 +23,46 @@ function ModoBadge({ informe }: { informe: Informe }) {
       }`}
     >
       {ia ? <Sparkles className="h-3.5 w-3.5" /> : <FileCog className="h-3.5 w-3.5" />}
-      {ia ? `Redactado por IA (${informe.modelo})` : "Redactado por plantillas deterministas"}
+      {ia
+        ? `Redactado por IA (${informe.modelo})`
+        : "Redactado por plantillas deterministas"}
     </span>
+  );
+}
+
+function Prosa({ texto }: { texto: string }) {
+  return <p className="whitespace-pre-line text-sm leading-relaxed text-foreground/90">{texto}</p>;
+}
+
+function Seccion({
+  n,
+  titulo,
+  children,
+}: {
+  n: string;
+  titulo: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Card className="p-6">
+      <h2 className="mb-3 border-b border-border pb-2 text-xl font-bold">
+        {n}. {titulo}
+      </h2>
+      {children}
+    </Card>
+  );
+}
+
+function IocTabla({ titulo, valores }: { titulo: string; valores: string[] }) {
+  return (
+    <tr>
+      <th className="w-1/3 border border-border bg-muted/40 px-2 py-1.5 text-left align-top text-xs">
+        {titulo}
+      </th>
+      <td className="border border-border px-2 py-1.5 font-mono text-xs">
+        {valores.length ? valores.join(", ") : "—"}
+      </td>
+    </tr>
   );
 }
 
@@ -74,8 +113,9 @@ export function ReportView({ analisis }: { analisis: AnalyzeResponse }) {
         </div>
         <h3 className="text-lg font-semibold">Genera el informe técnico</h3>
         <p className="mt-1 max-w-md text-sm text-muted-foreground">
-          Se redactará a partir de la evidencia detectada (hallazgos e incidentes).
-          Si hay API key de Anthropic se usa IA; si no, plantillas deterministas.
+          Se redactará a partir de la evidencia detectada. Si hay API key de
+          Anthropic se usa IA; si no, plantillas deterministas. La estructura y los
+          datos (tablas, Log_ID, IoCs) son siempre deterministas.
         </p>
         <button
           onClick={generar}
@@ -93,6 +133,8 @@ export function ReportView({ analisis }: { analisis: AnalyzeResponse }) {
       </Card>
     );
   }
+
+  const n = informe.narrativa;
 
   return (
     <div className="space-y-4">
@@ -120,30 +162,84 @@ export function ReportView({ analisis }: { analisis: AnalyzeResponse }) {
           {informe.clasificacion}
         </p>
         <h1 className="mt-3 text-3xl font-bold">{informe.titulo}</h1>
-        <p className="mt-2 text-muted-foreground">{informe.cliente}</p>
-        <div className="mt-6 text-sm text-muted-foreground">
+        <div className="mx-auto mt-2 h-1 w-20 rounded bg-primary" />
+        <div className="mt-6 space-y-1 text-sm text-muted-foreground">
+          <p>Cliente: <span className="font-medium text-foreground">{informe.cliente}</span></p>
           <p>Analista: <span className="font-medium text-foreground">{informe.analista}</span></p>
-          <p>{informe.generado}</p>
+          <p>Fecha: {informe.generado}</p>
         </div>
       </Card>
 
-      {/* Secciones */}
-      {informe.secciones.map((s) => (
-        <Card key={s.id} className="p-6">
-          <h2 className="mb-3 border-b border-border pb-2 text-xl font-bold">{s.titulo}</h2>
-          <div className="prose-sm max-w-none space-y-2 text-sm leading-relaxed">
-            {s.contenido.split("\n").map((linea, i) =>
-              linea.trim() === "" ? (
-                <div key={i} className="h-2" />
-              ) : (
-                <p key={i} className="text-foreground/90">
-                  {linea}
-                </p>
-              )
-            )}
-          </div>
-        </Card>
-      ))}
+      <Seccion n="1" titulo="Resumen ejecutivo">
+        <Prosa texto={n["resumen_ejecutivo"] ?? ""} />
+      </Seccion>
+
+      <Seccion n="2" titulo="Alcance y metodología">
+        <Prosa texto={n["alcance"] ?? ""} />
+      </Seccion>
+
+      <Seccion n="3" titulo="Hallazgos por criticidad">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-muted/50 text-muted-foreground">
+              <tr>
+                <th className="px-2 py-1.5">ID</th>
+                <th className="px-2 py-1.5">Criticidad</th>
+                <th className="px-2 py-1.5">Hallazgo</th>
+                <th className="px-2 py-1.5">Evidencia</th>
+                <th className="px-2 py-1.5">MITRE</th>
+              </tr>
+            </thead>
+            <tbody>
+              {informe.hallazgos.map((h) => (
+                <tr key={h.id} className="border-t border-border">
+                  <td className="px-2 py-1.5 font-mono">{h.id}</td>
+                  <td className="px-2 py-1.5"><SeverityBadge criticidad={h.criticidad} size="sm" /></td>
+                  <td className="px-2 py-1.5">{h.titulo}</td>
+                  <td className="px-2 py-1.5 text-muted-foreground">{h.evidencia.length} ev.</td>
+                  <td className="px-2 py-1.5 font-mono text-[11px] text-muted-foreground">{h.mitre.join(", ")}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Seccion>
+
+      <Seccion n="4-6" titulo="Incidentes y clasificación de riesgos">
+        <div className="space-y-4">
+          {informe.incidentes.map((inc) => (
+            <div key={inc.id} className="rounded-lg border border-border p-4">
+              <div className="mb-2 flex items-center gap-2">
+                <span className="font-mono text-sm text-muted-foreground">{inc.id}</span>
+                <SeverityBadge criticidad={inc.criticidad} size="sm" />
+                {inc.multi_vector && <span className="text-xs text-primary">multi-vector</span>}
+              </div>
+              <Prosa texto={n["inc_" + inc.id] ?? inc.justificacion} />
+            </div>
+          ))}
+        </div>
+      </Seccion>
+
+      <Seccion n="7" titulo="Impacto en la organización">
+        <Prosa texto={n["impacto_organizacion"] ?? ""} />
+      </Seccion>
+
+      <Seccion n="9" titulo="Recomendaciones generales de seguridad">
+        <Prosa texto={n["recomendaciones"] ?? ""} />
+      </Seccion>
+
+      <Seccion n="10" titulo="Anexos — IoCs">
+        <table className="w-full border-collapse">
+          <tbody>
+            <IocTabla titulo="IPs externas de origen" valores={informe.iocs.ips_origen} />
+            <IocTabla titulo="IPs externas de destino / exfil" valores={informe.iocs.ips_destino} />
+            <IocTabla titulo="Cuentas involucradas" valores={informe.iocs.usuarios} />
+            <IocTabla titulo="Hosts afectados" valores={informe.iocs.hosts} />
+            <IocTabla titulo="Archivos" valores={informe.iocs.archivos} />
+            <IocTabla titulo="Tareas / servicios" valores={informe.iocs.tareas_servicios} />
+          </tbody>
+        </table>
+      </Seccion>
     </div>
   );
 }

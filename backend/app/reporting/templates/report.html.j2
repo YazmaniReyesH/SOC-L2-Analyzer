@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<title>{{ inf.titulo }}</title>
+<style>
+  @page {
+    size: A4;
+    margin: 2.2cm 1.8cm 2cm 1.8cm;
+    @top-center { content: "CONFIDENCIAL — Análisis de Incidentes SOC N2"; font-size: 8pt; color: #999; }
+    @bottom-left { content: "{{ inf.analista }}"; font-size: 8pt; color: #999; }
+    @bottom-right { content: "Página " counter(page) " de " counter(pages); font-size: 8pt; color: #999; }
+  }
+  @page portada { @top-center { content: none; } @bottom-left { content: none; } @bottom-right { content: none; } }
+
+  * { box-sizing: border-box; }
+  body { font-family: "DejaVu Sans", "Helvetica", sans-serif; font-size: 10.5pt; color: #1f2937; line-height: 1.45; }
+  h1 { font-size: 20pt; }
+  h2 { font-size: 15pt; color: #0f172a; border-bottom: 2px solid #2563eb; padding-bottom: 4px; margin-top: 26px; }
+  h3 { font-size: 12pt; color: #0f172a; margin-top: 16px; margin-bottom: 4px; }
+  .narr { white-space: pre-line; text-align: justify; }
+  table { width: 100%; border-collapse: collapse; margin: 8px 0 14px; font-size: 9pt; }
+  th, td { border: 1px solid #d1d5db; padding: 5px 7px; text-align: left; vertical-align: top; }
+  th { background: #f1f5f9; font-weight: 700; }
+  .mono { font-family: "DejaVu Sans Mono", monospace; font-size: 8.5pt; }
+  .badge { display: inline-block; padding: 1px 8px; border-radius: 10px; color: #fff; font-size: 8pt; font-weight: 700; }
+  .chip { display: inline-block; background: #eef2ff; color: #3730a3; border-radius: 4px; padding: 0 5px; margin: 1px; font-size: 8pt; }
+
+  /* Portada */
+  .portada { page: portada; height: 24cm; display: flex; flex-direction: column; justify-content: center; text-align: center; page-break-after: always; }
+  .portada .clasif { color: #e02424; font-weight: 800; letter-spacing: 3px; font-size: 11pt; }
+  .portada .titulo { font-size: 30pt; font-weight: 800; color: #0f172a; margin: 18px 0; }
+  .portada .rule { width: 90px; height: 4px; background: #2563eb; margin: 10px auto 26px; }
+  .portada .meta { color: #334155; font-size: 12pt; line-height: 2; }
+  .portada .modo { margin-top: 30px; font-size: 9pt; color: #64748b; }
+
+  /* Índice */
+  .toc { page-break-after: always; }
+  .toc h2 { border: none; }
+  .toc ol { list-style: none; padding: 0; }
+  .toc li { margin: 7px 0; font-size: 11pt; }
+  .toc a { text-decoration: none; color: #1f2937; }
+  .toc a::after { content: "  " leader('.') "  p. " target-counter(attr(href url), page); color: #64748b; }
+
+  .section { page-break-before: always; }
+  .small { font-size: 8.5pt; color: #64748b; }
+  ul { margin: 4px 0; padding-left: 18px; }
+</style>
+</head>
+<body>
+
+<!-- ======================= PORTADA ======================= -->
+<div class="portada">
+  <div class="clasif">{{ inf.clasificacion | upper }}</div>
+  <div class="titulo">{{ inf.titulo }}</div>
+  <div class="rule"></div>
+  <div class="meta">
+    <div><strong>Cliente:</strong> {{ inf.cliente }}</div>
+    <div><strong>Analista:</strong> {{ inf.analista }}</div>
+    <div><strong>Fecha:</strong> {{ inf.generado }}</div>
+  </div>
+  <div class="modo">
+    Modo de redacción:
+    {% if inf.modo_ia == "ia" %}IA ({{ inf.modelo }}){% else %}Plantillas deterministas{% endif %}
+    · Detección 100% determinista · Hallazgos trazables a Log_ID
+  </div>
+</div>
+
+<!-- ======================= ÍNDICE ======================= -->
+<div class="toc">
+  <h2>Índice</h2>
+  <ol>
+    <li><a href="#sec1">1. Resumen ejecutivo</a></li>
+    <li><a href="#sec2">2. Alcance y metodología</a></li>
+    <li><a href="#sec3">3. Tabla de hallazgos por criticidad</a></li>
+    <li><a href="#sec4">4. Detalle por hallazgo</a></li>
+    <li><a href="#sec5">5. Línea de tiempo de los incidentes</a></li>
+    <li><a href="#sec6">6. Clasificación de riesgos</a></li>
+    <li><a href="#sec7">7. Impacto en la organización</a></li>
+    <li><a href="#sec8">8. Plan de acción</a></li>
+    <li><a href="#sec9">9. Recomendaciones generales de seguridad</a></li>
+    <li><a href="#sec10">10. Anexos — IoCs y eventos relevantes</a></li>
+  </ol>
+</div>
+
+<!-- ============ 1. RESUMEN EJECUTIVO ============ -->
+<div class="section" id="sec1">
+  <h2>1. Resumen ejecutivo</h2>
+  <p class="narr">{{ inf.narrativa.get("resumen_ejecutivo", "") }}</p>
+</div>
+
+<!-- ============ 2. ALCANCE Y METODOLOGÍA ============ -->
+<div class="section" id="sec2">
+  <h2>2. Alcance y metodología</h2>
+  <p class="narr">{{ inf.narrativa.get("alcance", "") }}</p>
+  <table>
+    <tr><th>Eventos analizados</th><td>{{ inf.estadisticas.total_eventos }}</td></tr>
+    <tr><th>Rango temporal</th><td>
+      {% if inf.estadisticas.rango_temporal.inicio %}{{ inf.estadisticas.rango_temporal.inicio }} — {{ inf.estadisticas.rango_temporal.fin }}{% else %}n/d{% endif %}
+    </td></tr>
+    <tr><th>Hosts</th><td>{{ inf.estadisticas.hosts_afectados | length }}</td></tr>
+    <tr><th>IPs externas</th><td>
+      {{ inf.estadisticas.ips_externas_unicas | length }}
+      ({{ inf.estadisticas.ips_externas_origen | length }} origen, {{ inf.estadisticas.ips_externas_destino | length }} destino/exfil)
+    </td></tr>
+    <tr><th>Fuentes de log</th><td>{% for c in inf.estadisticas.por_log_source %}{{ c.etiqueta }} ({{ c.valor }}){% if not loop.last %}, {% endif %}{% endfor %}</td></tr>
+  </table>
+</div>
+
+<!-- ============ 3. TABLA DE HALLAZGOS ============ -->
+<div class="section" id="sec3">
+  <h2>3. Tabla de hallazgos por criticidad</h2>
+  <table>
+    <tr><th>ID</th><th>Criticidad</th><th>Regla</th><th>Hallazgo</th><th>Evidencia</th><th>MITRE</th></tr>
+    {% for h in inf.hallazgos %}
+    <tr>
+      <td class="mono">{{ h.id }}</td>
+      <td><span class="badge" style="background: {{ color.get(h.criticidad, '#666') }}">{{ h.criticidad }}</span></td>
+      <td class="mono">{{ h.regla }}</td>
+      <td>{{ h.titulo }}</td>
+      <td class="small">{{ h.evidencia | length }} evento(s)</td>
+      <td class="mono small">{{ h.mitre | join(", ") }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+
+<!-- ============ 4. DETALLE POR HALLAZGO ============ -->
+<div class="section" id="sec4">
+  <h2>4. Detalle por hallazgo</h2>
+  {% for h in inf.hallazgos %}
+  <h3>{{ h.id }} · {{ h.titulo }}
+    <span class="badge" style="background: {{ color.get(h.criticidad, '#666') }}">{{ h.criticidad }}</span>
+  </h3>
+  <p><strong>Justificación.</strong> {{ h.justificacion }}</p>
+  {% if h.impacto %}<p><strong>Impacto.</strong> {{ h.impacto }}</p>{% endif %}
+  <p><strong>MITRE ATT&amp;CK:</strong> {% for m in h.mitre %}<span class="chip">{{ m }}</span>{% endfor %}</p>
+  <p><strong>Entidades:</strong>
+    {% for a in h.activos %}<span class="chip">{{ a }}</span>{% endfor %}
+    {% for u in h.usuarios %}<span class="chip">{{ u }}</span>{% endfor %}
+    {% for i in h.ips %}<span class="chip">{{ i }}</span>{% endfor %}
+  </p>
+  <p><strong>Evidencia (Log_ID):</strong> <span class="mono small">{{ h.evidencia | join(", ") }}</span></p>
+  {% endfor %}
+</div>
+
+<!-- ============ 5. LÍNEA DE TIEMPO ============ -->
+<div class="section" id="sec5">
+  <h2>5. Línea de tiempo de los incidentes</h2>
+  {% for inc in inf.incidentes %}
+  <h3>{{ inc.id }} · {{ inc.titulo }}</h3>
+  <table>
+    <tr><th>Timestamp</th><th>Etapa</th><th>Host</th><th>Log_ID</th><th>Descripción</th></tr>
+    {% for t in inc.linea_tiempo %}
+    <tr>
+      <td class="mono">{{ t.timestamp_str }}</td>
+      <td>{{ t.etapa }}</td>
+      <td class="mono">{{ t.hostname }}</td>
+      <td class="mono">{{ t.log_id }}</td>
+      <td class="small">{{ t.descripcion }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% endfor %}
+</div>
+
+<!-- ============ 6. CLASIFICACIÓN DE RIESGOS ============ -->
+<div class="section" id="sec6">
+  <h2>6. Clasificación de riesgos</h2>
+  <p class="small">Matriz determinista: un incidente es <strong>Crítico</strong> si involucra
+  exfiltración o una cadena de 4+ etapas; en otro caso toma la criticidad máxima de sus hallazgos.</p>
+  {% for inc in inf.incidentes %}
+  <h3>{{ inc.id }} · {{ inc.titulo }}
+    <span class="badge" style="background: {{ color.get(inc.criticidad, '#666') }}">{{ inc.criticidad }}</span>
+    {% if inc.multi_vector %}<span class="chip">multi-vector</span>{% endif %}
+  </h3>
+  <p class="narr">{{ inf.narrativa.get("inc_" ~ inc.id, inc.justificacion) }}</p>
+  {% endfor %}
+</div>
+
+<!-- ============ 7. IMPACTO EN LA ORGANIZACIÓN ============ -->
+<div class="section" id="sec7">
+  <h2>7. Impacto en la organización</h2>
+  <p class="narr">{{ inf.narrativa.get("impacto_organizacion", "") }}</p>
+</div>
+
+<!-- ============ 8. PLAN DE ACCIÓN ============ -->
+{% set inv = namespace(i=[], c=[], r=[]) %}
+{% for h in inf.hallazgos %}
+  {% for a in h.acciones.investigar %}{% if a not in inv.i %}{% set inv.i = inv.i + [a] %}{% endif %}{% endfor %}
+  {% for a in h.acciones.contener %}{% if a not in inv.c %}{% set inv.c = inv.c + [a] %}{% endif %}{% endfor %}
+  {% for a in h.acciones.remediar %}{% if a not in inv.r %}{% set inv.r = inv.r + [a] %}{% endif %}{% endfor %}
+{% endfor %}
+<div class="section" id="sec8">
+  <h2>8. Plan de acción</h2>
+  <h3>Investigar</h3><ul>{% for a in inv.i %}<li>{{ a }}</li>{% endfor %}</ul>
+  <h3>Contener</h3><ul>{% for a in inv.c %}<li>{{ a }}</li>{% endfor %}</ul>
+  <h3>Remediar</h3><ul>{% for a in inv.r %}<li>{{ a }}</li>{% endfor %}</ul>
+</div>
+
+<!-- ============ 9. RECOMENDACIONES ============ -->
+<div class="section" id="sec9">
+  <h2>9. Recomendaciones generales de seguridad</h2>
+  <p class="narr">{{ inf.narrativa.get("recomendaciones", "") }}</p>
+</div>
+
+<!-- ============ 10. ANEXOS ============ -->
+<div class="section" id="sec10">
+  <h2>10. Anexos — IoCs y eventos relevantes</h2>
+
+  <h3>Indicadores de compromiso (IoCs)</h3>
+  <table>
+    <tr><th>IPs externas de origen</th><td class="mono">{{ inf.iocs.ips_origen | join(", ") or "—" }}</td></tr>
+    <tr><th>IPs externas de destino / exfil</th><td class="mono">{{ inf.iocs.ips_destino | join(", ") or "—" }}</td></tr>
+    <tr><th>Cuentas involucradas</th><td class="mono">{{ inf.iocs.usuarios | join(", ") or "—" }}</td></tr>
+    <tr><th>Hosts afectados</th><td class="mono">{{ inf.iocs.hosts | join(", ") or "—" }}</td></tr>
+    <tr><th>Archivos</th><td class="mono">{{ inf.iocs.archivos | join(", ") or "—" }}</td></tr>
+    <tr><th>Tareas / servicios</th><td class="mono">{{ inf.iocs.tareas_servicios | join(", ") or "—" }}</td></tr>
+  </table>
+
+  <h3>Eventos relevantes</h3>
+  {% set vistos = namespace(ids=[]) %}
+  <table>
+    <tr><th>Timestamp</th><th>Host</th><th>Etapa</th><th>Log_ID</th><th>Descripción</th></tr>
+    {% for inc in inf.incidentes %}
+      {% for t in inc.linea_tiempo %}
+        {% if t.log_id not in vistos.ids %}
+          {% set vistos.ids = vistos.ids + [t.log_id] %}
+          <tr>
+            <td class="mono">{{ t.timestamp_str }}</td>
+            <td class="mono">{{ t.hostname }}</td>
+            <td class="small">{{ t.etapa }}</td>
+            <td class="mono">{{ t.log_id }}</td>
+            <td class="small">{{ t.descripcion }}</td>
+          </tr>
+        {% endif %}
+      {% endfor %}
+    {% endfor %}
+  </table>
+</div>
+
+</body>
+</html>

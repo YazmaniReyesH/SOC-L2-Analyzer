@@ -7,12 +7,13 @@ Endpoints:
 """
 from __future__ import annotations
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
-from .models import AnalyzeResponse
+from .models import AnalyzeResponse, Informe
 from .parsing import ParseError, load_events
+from .reporting import construir_informe, informe_a_pdf
 from .service import analizar_eventos
 
 app = FastAPI(
@@ -21,7 +22,7 @@ app = FastAPI(
         "API de análisis de incidentes de seguridad. Detección 100% "
         "determinista; la IA solo redacta el informe a partir de la evidencia."
     ),
-    version="0.2.0",
+    version="0.3.0",
 )
 
 app.add_middleware(
@@ -66,3 +67,29 @@ async def analyze(file: UploadFile = File(...)) -> AnalyzeResponse:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     return analizar_eventos(eventos)
+
+
+@app.post("/api/report", response_model=Informe, tags=["informe"])
+def report(analisis: AnalyzeResponse) -> Informe:
+    """Construye el informe redactado (IA si hay API key; si no, plantillas)."""
+    return construir_informe(analisis)
+
+
+@app.post("/api/report/pdf", tags=["informe"])
+def report_pdf(informe: Informe) -> Response:
+    """Renderiza el informe a PDF (WeasyPrint)."""
+    try:
+        pdf = informe_a_pdf(informe)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "No se pudo generar el PDF. Verifica que WeasyPrint y sus "
+                f"dependencias (GTK) estén instaladas. Detalle: {exc}"
+            ),
+        ) from exc
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": 'attachment; filename="Informe_SOC_L2.pdf"'},
+    )

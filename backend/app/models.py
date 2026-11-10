@@ -165,3 +165,40 @@ class AnalyzeResponse(BaseModel):
     eventos_preview: list[LogEvent] = Field(default_factory=list)
     hallazgos: list[Finding] = Field(default_factory=list)
     incidentes: list[Incidente] = Field(default_factory=list)
+
+
+# --------------------------------------------------------------------------- #
+# Informe (Módulo 5)
+# --------------------------------------------------------------------------- #
+class IoCs(BaseModel):
+    """Indicadores de compromiso consolidados (derivados de la evidencia)."""
+
+    ips_origen: list[str] = Field(default_factory=list)
+    ips_destino: list[str] = Field(default_factory=list)
+    usuarios: list[str] = Field(default_factory=list)
+    hosts: list[str] = Field(default_factory=list)
+    archivos: list[str] = Field(default_factory=list)
+    tareas_servicios: list[str] = Field(default_factory=list)
+
+
+class Informe(BaseModel):
+    """Informe técnico. La estructura y los datos son deterministas; la IA
+    (cuando está disponible) solo reescribe la PROSA de `narrativa`.
+    """
+
+    modo_ia: Literal["ia", "plantillas"]
+    modelo: str | None = None
+    generado: str
+    titulo: str
+    cliente: str
+    analista: str
+    clasificacion: str
+    resumen: str
+    # Prosa por sección (clave -> texto). Claves: resumen_ejecutivo, alcance,
+    # impacto_organizacion, recomendaciones, e inc_<ID> por incidente.
+    narrativa: dict[str, str] = Field(default_factory=dict)
+    # Datos estructurados para tablas (deterministas, intactos use IA o no).
+    estadisticas: Estadisticas
+    incidentes: list[Incidente] = Field(default_factory=list)
+    hallazgos: list[Finding] = Field(default_factory=list)
+    iocs: IoCs = Field(default_factory=IoCs)

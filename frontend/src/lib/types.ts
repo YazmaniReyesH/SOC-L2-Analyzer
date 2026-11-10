@@ -122,10 +122,13 @@ export interface AnalyzeResponse {
 }
 
 // --- Informe (Módulo 5) ---
-export interface SeccionInforme {
-  id: string;
-  titulo: string;
-  contenido: string; // markdown/párrafos
+export interface IoCs {
+  ips_origen: string[];
+  ips_destino: string[];
+  usuarios: string[];
+  hosts: string[];
+  archivos: string[];
+  tareas_servicios: string[];
 }
 
 export interface Informe {
@@ -136,5 +139,10 @@ export interface Informe {
   cliente: string;
   analista: string;
   clasificacion: string;
-  secciones: SeccionInforme[];
+  resumen: string;
+  narrativa: Record<string, string>;
+  estadisticas: Estadisticas;
+  incidentes: Incidente[];
+  hallazgos: Finding[];
+  iocs: IoCs;
 }
