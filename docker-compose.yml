@@ -8,9 +8,14 @@ services:
     container_name: soc-l2-backend
     ports:
       - "8000:8000"
+    # ANTHROPIC_API_KEY y ANTHROPIC_MODEL se leen de .env (raíz) o backend/.env,
+    # lo que exista (ambos opcionales). La clave NUNCA se pasa al frontend.
+    env_file:
+      - path: .env
+        required: false
+      - path: backend/.env
+        required: false
     environment:
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
-      - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-claude-sonnet-5}
       - CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
     volumes:
       - ./backend:/app

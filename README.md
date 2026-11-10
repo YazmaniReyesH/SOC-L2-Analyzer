@@ -130,6 +130,12 @@ un error claro.
 | `REPORT_CLIENTE` | backend | Nombre del cliente en la portada. | `Organización Evaluada` |
 | `VITE_API_TARGET` | frontend | Target del proxy `/api` en dev. | `localhost:8000` |
 
+> **Dónde poner la clave.** Para **local**, en `backend/.env` (`config.py` lo carga
+> siempre, sin importar desde dónde ejecutes). Para **Docker**, en `.env` de la raíz
+> **o** en `backend/.env` (ambos los lee `docker-compose.yml` vía `env_file`). La
+> clave **nunca** se expone al frontend (solo variables `VITE_*`), y los `.env` están
+> en `.gitignore`. Con la clave presente, `GET /api/health` reporta `modo_ia: "ia"`.
+
 ## Endpoints
 
 - `GET  /api/health` — estado y modo de IA.

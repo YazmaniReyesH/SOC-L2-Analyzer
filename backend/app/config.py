@@ -7,11 +7,18 @@ editar desde `.env`.
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 from dotenv import load_dotenv
 
-# Carga variables desde backend/.env si existe (no falla si no existe).
-load_dotenv()
+# Carga variables de entorno de forma robusta (independiente del CWD):
+# 1) backend/.env (junto al código) — para desarrollo local.
+# 2) .env en el CWD / raíz — útil si se arranca desde otra ubicación.
+# En Docker las variables llegan por el entorno del contenedor y tienen
+# prioridad: load_dotenv NO sobreescribe variables ya definidas.
+_BACKEND_ENV = Path(__file__).resolve().parent.parent / ".env"
+load_dotenv(_BACKEND_ENV)  # backend/.env
+load_dotenv()  # además, un .env en el CWD si existe
 
 
 class Settings:
