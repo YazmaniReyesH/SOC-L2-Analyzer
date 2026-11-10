@@ -63,13 +63,20 @@ function Panel({
   );
 }
 
-const tooltipStyle = {
-  backgroundColor: "hsl(222 40% 11%)",
-  border: "1px solid hsl(217 33% 25%)",
-  borderRadius: 8,
-  color: "hsl(210 40% 98%)",
-  fontSize: 12,
+// Estilos explícitos para que los tooltips sean legibles en dark mode
+// (fondo de panel oscuro + texto claro en contenedor, etiqueta e items).
+const TOOLTIP = {
+  contentStyle: {
+    backgroundColor: "#1e293b",
+    border: "1px solid #334155",
+    borderRadius: 8,
+    color: "#e2e8f0",
+    fontSize: 12,
+  },
+  labelStyle: { color: "#e2e8f0", fontWeight: 600, marginBottom: 4 },
+  itemStyle: { color: "#e2e8f0" },
 };
+const LEYENDA = { fontSize: 11, color: "#e2e8f0" };
 
 export function Dashboard({
   estadisticas,
@@ -144,7 +151,7 @@ export function Dashboard({
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
               <XAxis dataKey="name" tick={{ fill: EJE, fontSize: 12 }} />
               <YAxis allowDecimals={false} tick={{ fill: EJE, fontSize: 12 }} />
-              <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "transparent" }} />
+              <Tooltip {...TOOLTIP} cursor={{ fill: "transparent" }} />
               <Bar dataKey="valor" radius={[6, 6, 0, 0]}>
                 {crit.map((c) => (
                   <Cell
@@ -163,7 +170,7 @@ export function Dashboard({
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
               <XAxis dataKey="hora" tick={{ fill: EJE, fontSize: 10 }} interval="preserveStartEnd" />
               <YAxis allowDecimals={false} tick={{ fill: EJE, fontSize: 12 }} />
-              <Tooltip contentStyle={tooltipStyle} />
+              <Tooltip {...TOOLTIP} />
               <Line type="monotone" dataKey="eventos" stroke="hsl(217 91% 60%)" strokeWidth={2} dot={false} />
             </LineChart>
           </ResponsiveContainer>
@@ -177,8 +184,8 @@ export function Dashboard({
                   <Cell key={idx} fill={PALETA[idx % PALETA.length]} />
                 ))}
               </Pie>
-              <Tooltip contentStyle={tooltipStyle} />
-              <Legend wrapperStyle={{ fontSize: 11, color: EJE }} />
+              <Tooltip {...TOOLTIP} />
+              <Legend wrapperStyle={LEYENDA} />
             </PieChart>
           </ResponsiveContainer>
         </Panel>
@@ -192,7 +199,7 @@ export function Dashboard({
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
               <XAxis type="number" allowDecimals={false} tick={{ fill: EJE, fontSize: 12 }} />
               <YAxis type="category" dataKey="ip" width={110} tick={{ fill: EJE, fontSize: 11 }} />
-              <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "transparent" }} />
+              <Tooltip {...TOOLTIP} cursor={{ fill: "transparent" }} />
               <Bar dataKey="conteo" fill="hsl(25 95% 53%)" radius={[0, 6, 6, 0]} />
             </BarChart>
           </ResponsiveContainer>
@@ -204,7 +211,7 @@ export function Dashboard({
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
               <XAxis dataKey="host" tick={{ fill: EJE, fontSize: 10 }} angle={-25} textAnchor="end" height={60} />
               <YAxis allowDecimals={false} tick={{ fill: EJE, fontSize: 12 }} />
-              <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "transparent" }} />
+              <Tooltip {...TOOLTIP} cursor={{ fill: "transparent" }} />
               <Bar dataKey="eventos" fill="hsl(199 89% 48%)" radius={[6, 6, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
