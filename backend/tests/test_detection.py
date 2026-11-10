@@ -156,10 +156,13 @@ def test_ac4_persistencia(resultado):
     assert h is not None, "No se detectó la persistencia en APP-SRV01."
     assert h.criticidad == "Alto"
     assert "CORP\\helpdesk" in h.usuarios
-    assert "UpdateCheck" in h.justificacion
-    assert "WinUpdateHelper" in h.justificacion
+    # La evidencia (tarea 4698 + servicio 7045) proviene de los eventos reales.
     assert {"EVT-00523", "EVT-00524"} <= set(h.evidencia)
     assert "T1053.005" in h.mitre and "T1543.003" in h.mitre
+    # Masquerading detectado de forma AGNÓSTICA (nombre tipo-sistema + ubicación
+    # no confiable), sin codificar los nombres del demo en la regla.
+    assert "T1036" in h.mitre
+    assert "masquerading" in h.justificacion.lower()
 
 
 # --------------------------------------------------------------------------- #

@@ -441,6 +441,9 @@ def r5_movimiento_lateral(eventos: list[LogEvent]) -> list[Finding]:
             }
         )
         det_arch = f" Archivos sensibles accedidos: {', '.join(archivos)}." if archivos else ""
+        det_share = (
+            " Posteriormente accedió a shares catalogados como sensibles." if shares else ""
+        )
         findings.append(
             _mk(
                 "R5",
@@ -450,7 +453,7 @@ def r5_movimiento_lateral(eventos: list[LogEvent]) -> list[Finding]:
                 (
                     f"La cuenta {user} autenticó con LogonType=3 hacia "
                     f"{', '.join(sorted(destinos))} desde un host interno ya involucrado "
-                    f"y accedió a shares sensibles ({', '.join(C.SHARES_SENSIBLES)})." + det_arch
+                    "en la actividad maliciosa." + det_share + det_arch
                 ),
                 evidencia,
                 mitre=["T1021.002", "T1039", "T1570"],
@@ -473,33 +476,41 @@ def r5_movimiento_lateral(eventos: list[LogEvent]) -> list[Finding]:
         )
 
     # --- Parte B: colección masiva de archivos en un share sensible ---
-    coleccion: dict[tuple[str, str], list[LogEvent]] = defaultdict(list)
+    # AGNÓSTICA: agrupa por (usuario, objetivo) y exige ráfaga de accesos;
+    # la lista de shares sensibles solo ELEVA la criticidad, no condiciona.
+    accesos: dict[tuple[str, str], list[LogEvent]] = defaultdict(list)
     for e in eventos:
-        if e.event_id in ("4663", "5145") and any(
-            s.lower() in _texto(e).lower() for s in C.SHARES_SENSIBLES
-        ):
-            coleccion[(e.user, e.hostname)].append(e)
+        if e.event_id in ("4663", "5145"):
+            objetivo = e.destination or e.hostname
+            accesos[(e.user, objetivo)].append(e)
 
-    for (user, host), evs in coleccion.items():
-        if len(evs) < C.COLECCION_MIN_ACCESOS:
+    for (user, objetivo), evs in accesos.items():
+        cluster = _cluster_en_ventana(evs, C.COLECCION_VENTANA_MIN, C.COLECCION_MIN_ACCESOS)
+        if not cluster:
             continue
+        contexto = (objetivo + " " + " ".join(_texto(x) for x in cluster)).lower()
+        sensible = any(s.lower() in contexto for s in C.SHARES_SENSIBLES)
+        crit = "Alto" if sensible else "Medio"
+        etiqueta = "sensibles " if sensible else ""
         findings.append(
             _mk(
                 "R5",
-                f"Colección masiva de archivos sensibles por {user} en {host}",
+                f"Colección masiva de archivos {etiqueta}por {user} en {objetivo}",
                 "Colección",
-                "Alto",
+                crit,
                 (
-                    f"Se registraron {len(evs)} accesos a archivos de un share sensible "
-                    f"({', '.join(C.SHARES_SENSIBLES)}) por {user} en {host}, consistente "
-                    "con recolección de datos previa a exfiltración."
+                    f"Se registraron {len(cluster)} accesos a archivos del mismo objetivo "
+                    f"({objetivo}) por {user} dentro de una ventana de "
+                    f"{C.COLECCION_VENTANA_MIN} min, consistente con recolección de datos "
+                    "previa a exfiltración."
+                    + (" El objetivo está catalogado como sensible." if sensible else "")
                 ),
-                evs,
+                cluster,
                 mitre=["T1039", "T1005", "T1560.001"],
-                impacto="Recolección de datos sensibles para su posterior exfiltración.",
+                impacto="Recolección de datos para su posterior exfiltración.",
                 acciones=Acciones(
                     investigar=[f"Determinar el alcance de los datos accedidos por {user}."],
-                    contener=[f"Revocar el acceso de {user} a los shares sensibles."],
+                    contener=[f"Revocar el acceso de {user} al recurso {objetivo}."],
                     remediar=["Implementar DLP y auditoría de acceso a datos críticos."],
                 ),
             )
@@ -674,8 +685,13 @@ def r7_persistencia(eventos: list[LogEvent]) -> list[Finding]:
     findings: list[Finding] = []
     for (host, user), evs in por_host.items():
         texto = " ".join(_texto(e) for e in evs)
-        masquerading = [n for n in C.NOMBRES_MASQUERADING if n.lower() in texto.lower()]
-        programdata = "C:\\ProgramData" in texto
+        # Nombre de la tarea/servicio (agnóstico: no se codifican nombres del demo).
+        nombres = re.findall(r"(?:TaskName|ServiceName)=([^;]+)", texto)
+        nombre_txt = " ".join(nombres) if nombres else texto
+        nombre_sistema = any(re.search(p, nombre_txt, re.I) for p in C.TOKENS_NOMBRE_SISTEMA)
+        ubic_sosp = any(re.search(p, texto, re.I) for p in C.UBICACIONES_SOSPECHOSAS)
+        en_confiable = any(re.search(p, texto, re.I) for p in C.UBICACIONES_CONFIABLES)
+        masquerading = nombre_sistema and ubic_sosp and not en_confiable
         mitre = ["T1053.005", "T1543.003"]
         if masquerading:
             mitre.append("T1036")
@@ -689,9 +705,12 @@ def r7_persistencia(eventos: list[LogEvent]) -> list[Finding]:
             f"{' y '.join(tipos)}."
         )
         if masquerading:
-            just += f" Los nombres imitan componentes de Windows ({', '.join(sorted(set(masquerading)))}) — masquerading."
-        if programdata:
-            just += " Los binarios/scripts residen en C:\\ProgramData (ubicación anómala)."
+            just += (
+                " El nombre imita un componente del sistema y el binario reside en una "
+                "ubicación no confiable (masquerading)."
+            )
+        elif ubic_sosp:
+            just += " El binario/script reside en una ubicación no estándar."
         findings.append(
             _mk(
                 "R7",
@@ -792,7 +811,7 @@ def _normaliza_host(h: str) -> str:
 def r9_anomalias(eventos: list[LogEvent]) -> list[Finding]:
     findings: list[Finding] = []
 
-    # --- Inconsistencia de hostnames (p. ej. DC-01 vs DC01) ---
+    # --- Inconsistencia de hostnames (variantes del mismo nombre normalizado) ---
     variantes: dict[str, set[str]] = defaultdict(set)
     for e in eventos:
         if e.hostname:

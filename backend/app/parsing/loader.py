@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import ipaddress
 import math
+import re
 from datetime import datetime
 from io import BytesIO
 from pathlib import Path
@@ -117,6 +118,10 @@ def _read_dataframe(source: str | Path | bytes) -> pd.DataFrame:
 
     hoja = SHEET_NAME if SHEET_NAME in xl.sheet_names else xl.sheet_names[0]
     df = pd.read_excel(xl, sheet_name=hoja, dtype=str)
+    # Normaliza encabezados: quita espacios alrededor y colapsa espacios internos.
+    # (tolera "Source_IP ", " Event_ID", etc.). Las columnas extra se conservan
+    # pero el parser solo usa las requeridas.
+    df.columns = [re.sub(r"\s+", " ", str(c)).strip() for c in df.columns]
     df.attrs["hoja"] = hoja
     return df
 
