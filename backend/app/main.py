@@ -77,16 +77,33 @@ def report(analisis: AnalyzeResponse) -> Informe:
 
 @app.post("/api/report/pdf", tags=["informe"])
 def report_pdf(informe: Informe) -> Response:
-    """Renderiza el informe a PDF (WeasyPrint)."""
+    """Renderiza el informe a PDF (WeasyPrint).
+
+    WeasyPrint se importa de forma perezosa dentro de `informe_a_pdf`, por lo que
+    la ausencia de WeasyPrint/GTK NO afecta al resto de la API (p. ej. /api/report
+    sigue funcionando). Aquí distinguimos:
+    - 503: la capacidad de PDF no está disponible en este entorno (falta
+      WeasyPrint o las librerías GTK) -> mensaje accionable, no un 500 genérico.
+    - 500: WeasyPrint está disponible pero el renderizado falló.
+    """
     try:
         pdf = informe_a_pdf(informe)
+    except (ImportError, OSError) as exc:
+        # ImportError: WeasyPrint no instalado. OSError: faltan libs GTK/Pango/Cairo.
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "La generación de PDF no está disponible en este entorno: "
+                "WeasyPrint o sus librerías del sistema (GTK/Pango/Cairo) no están "
+                "instaladas. Ejecuta la app con Docker (docker compose up --build), "
+                "que ya incluye estas dependencias, o instálalas en el sistema. "
+                f"Detalle técnico: {exc}"
+            ),
+        ) from exc
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(
             status_code=500,
-            detail=(
-                "No se pudo generar el PDF. Verifica que WeasyPrint y sus "
-                f"dependencias (GTK) estén instaladas. Detalle: {exc}"
-            ),
+            detail=f"Error al renderizar el PDF del informe. Detalle: {exc}",
         ) from exc
     return Response(
         content=pdf,

@@ -29,6 +29,7 @@ export function mensajeError(err: unknown, fallback = "Ocurrió un error."): str
     if (typeof detail === "string") return detail;
     if (err.message) return err.message;
   }
+  if (err instanceof Error && err.message) return err.message;
   return fallback;
 }
 
@@ -45,8 +46,23 @@ export async function generarInforme(analisis: AnalyzeResponse): Promise<Informe
 }
 
 export async function descargarPdf(informe: Informe): Promise<Blob> {
-  const { data } = await api.post("/api/report/pdf", informe, {
-    responseType: "blob",
-  });
-  return data as Blob;
+  try {
+    const { data } = await api.post("/api/report/pdf", informe, {
+      responseType: "blob",
+    });
+    return data as Blob;
+  } catch (err) {
+    // Cuando el PDF falla (p. ej. 503 sin WeasyPrint/GTK), el cuerpo del error
+    // llega como Blob; lo leemos para exponer el `detail` claro del backend.
+    if (axios.isAxiosError(err) && err.response?.data instanceof Blob) {
+      try {
+        const texto = await err.response.data.text();
+        const json = JSON.parse(texto);
+        if (json?.detail) throw new Error(json.detail);
+      } catch (e) {
+        if (e instanceof Error && e.message && !(e instanceof SyntaxError)) throw e;
+      }
+    }
+    throw err;
+  }
 }
