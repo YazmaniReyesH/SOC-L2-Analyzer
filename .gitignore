@@ -1,0 +1,32 @@
+# === Python / backend ===
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+
+# === Entornos / secretos ===
+.env
+backend/.env
+frontend/.env
+
+# === Node / frontend ===
+node_modules/
+dist/
+dist-ssr/
+*.local
+.vite/
+*.tsbuildinfo
+
+# === Editor / OS ===
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# === Salidas generadas ===
+*.pdf
+!backend/reporting/**/*.pdf
