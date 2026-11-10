@@ -161,6 +161,11 @@ function App() {
           </>
         )}
       </main>
+
+      <footer className="border-t border-border py-4 text-center text-xs text-muted-foreground">
+        SOC L2 Analyzer · Analista: Yazmani Reyes Hernández · Clasificación:
+        Confidencial · Detección determinista; la IA solo redacta.
+      </footer>
     </div>
   );
 }
